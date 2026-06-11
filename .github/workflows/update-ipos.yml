@@ -1,1 +1,40 @@
+name: Aggiorna feed IPO
+
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"   # dopo la chiusura USA, lun-ven
+  workflow_dispatch:           # trigger manuale / cron-job.org (piano B)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ipo-feed
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installa dipendenze
+        run: pip install --quiet requests yfinance pandas
+
+      - name: Genera feed
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/update_ipos.py
+
+      - name: Commit dati
+        run: |
+          git config user.name "ipo-desk-bot"
+          git config user.email "actions@github.com"
+          git add docs/data/*.json
+          git diff --staged --quiet || git commit -m "feed IPO $(date -u +'%Y-%m-%d %H:%M') [skip ci]"
+          git push
 
