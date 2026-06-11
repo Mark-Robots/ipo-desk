@@ -1,1 +1,332 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPO Desk · MarkRoboT.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0B0E13; --panel:#11151D; --panel2:#161B25; --line:#222A38;
+  --txt:#E8EAF0; --mut:#7C8698; --dim:#4A5468;
+  --acc:#F7931A; --green:#2ECC8F; --red:#F0524C; --blue:#4A9EE8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:13px;min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
 
+header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;
+  border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px}
+.brand h1{font-family:'Fraunces',serif;font-size:30px;font-weight:700;letter-spacing:-.5px}
+.brand h1 span{color:var(--acc)}
+.brand p{color:var(--mut);font-size:11px;margin-top:4px;letter-spacing:1.5px;text-transform:uppercase}
+.upd{color:var(--dim);font-size:11px;text-align:right}
+.upd b{color:var(--mut);font-weight:500}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .l{color:var(--mut);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px}
+.kpi .v{font-size:24px;font-weight:700}
+.kpi .s{color:var(--dim);font-size:10px;margin-top:4px}
+
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--mut);border-radius:8px;
+  padding:9px 18px;cursor:pointer;font-family:inherit;font-size:12px;letter-spacing:.5px}
+.tab.on{background:var(--acc);border-color:var(--acc);color:#10131A;font-weight:700}
+.tab:hover:not(.on){border-color:var(--acc);color:var(--txt)}
+
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+input[type=search]{background:var(--panel);border:1px solid var(--line);color:var(--txt);
+  border-radius:8px;padding:9px 14px;font-family:inherit;font-size:12px;width:240px;outline:none}
+input[type=search]:focus{border-color:var(--acc)}
+select{background:var(--panel);border:1px solid var(--line);color:var(--txt);
+  border-radius:8px;padding:9px 12px;font-family:inherit;font-size:12px;outline:none;cursor:pointer}
+select:focus{border-color:var(--acc)}
+.hint{color:var(--dim);font-size:11px}
+
+section{display:none}
+section.on{display:block}
+
+.day-group{margin-bottom:18px}
+.day-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.day-head .d{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--acc)}
+.day-head .c{color:var(--dim);font-size:11px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 16px;
+  display:grid;grid-template-columns:90px 1fr 130px 120px 110px;gap:12px;align-items:center;margin-bottom:8px}
+.card .sym{font-weight:700;font-size:15px;color:var(--txt)}
+.card .nm{color:var(--mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .meta{color:var(--dim);font-size:11px}
+.card .meta b{color:var(--mut);font-weight:500;display:block;font-size:12px}
+.badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);color:var(--mut);
+  border-radius:5px;padding:2px 8px;font-size:10px;letter-spacing:.5px;text-transform:uppercase}
+.badge.soon{border-color:var(--acc);color:var(--acc)}
+
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{width:100%;border-collapse:collapse;min-width:920px}
+th{color:var(--mut);font-size:10px;letter-spacing:1px;text-transform:uppercase;text-align:right;
+  padding:12px 12px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+th:first-child,th:nth-child(2){text-align:left}
+th:hover{color:var(--acc)}
+th .ar{color:var(--acc)}
+td{padding:11px 12px;border-bottom:1px solid #1A2030;text-align:right;font-size:12.5px;white-space:nowrap}
+td:first-child,td:nth-child(2){text-align:left}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--panel2)}
+.t-sym{font-weight:700;font-size:13px}
+.t-nm{color:var(--mut);max-width:230px;overflow:hidden;text-overflow:ellipsis}
+.t-dt{color:var(--dim)}
+.pos{color:var(--green)} .neg{color:var(--red)} .na{color:var(--dim)}
+.px{color:var(--mut);font-size:10.5px}
+.tab.mini{padding:6px 12px;font-size:11px}
+.src{font-size:9px;color:var(--dim);display:block}
+
+.chartbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:18px;margin-top:18px}
+.chartbox h3{font-family:'Fraunces',serif;font-size:15px;font-weight:700;margin-bottom:12px;color:var(--txt)}
+.chartwrap{position:relative;height:280px}
+
+.empty{color:var(--dim);text-align:center;padding:40px 0;font-size:12px}
+footer{margin-top:34px;color:var(--dim);font-size:10px;text-align:center;letter-spacing:1px}
+footer span{color:var(--acc)}
+@media(max-width:760px){
+  .card{grid-template-columns:70px 1fr;gap:6px}
+  .card .meta:nth-child(n+3){display:none}
+  input[type=search]{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">
+    <h1>IPO <span>Desk</span></h1>
+    <p>Calendario quotazioni &amp; performance post-listing · MarkRoboT.S.</p>
+  </div>
+  <div class="upd">Ultimo aggiornamento<br><b id="updated">—</b></div>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="l">IPO prossimi 30gg</div><div class="v" id="k-up">—</div><div class="s" id="k-up-s"></div></div>
+  <div class="kpi"><div class="l">Quotate ultimi 90gg</div><div class="v" id="k-new">—</div><div class="s">nel registro</div></div>
+  <div class="kpi"><div class="l">Media ritorno Day 1</div><div class="v" id="k-d1">—</div><div class="s">vs prezzo collocamento</div></div>
+  <div class="kpi"><div class="l">Positive a +1 mese</div><div class="v" id="k-m1">—</div><div class="s" id="k-m1-s"></div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-tab="cal">Calendario</button>
+  <button class="tab" data-tab="perf">Performance</button>
+</div>
+
+<section id="cal" class="on">
+  <div class="bar">
+    <input type="search" id="q-cal" placeholder="Cerca ticker o nome…">
+    <span class="hint">Collocamenti &gt; 30M$ · fonte Finnhub</span>
+  </div>
+  <div id="cal-list"></div>
+</section>
+
+<section id="perf">
+  <div class="bar">
+    <input type="search" id="q-perf" placeholder="Cerca ticker o nome…">
+    <select id="y-perf"><option value="">Tutti gli anni</option></select>
+    <div class="tabs" style="margin:0">
+      <button class="tab mini on" data-mode="both">% + $</button>
+      <button class="tab mini" data-mode="pct">solo %</button>
+      <button class="tab mini" data-mode="px">solo $</button>
+    </div>
+    <span class="hint">Rendimenti vs prezzo di collocamento (o open D1 se n.d.) · clic sulle intestazioni per ordinare</span>
+  </div>
+  <div class="tblwrap">
+    <table id="tbl">
+      <thead><tr>
+        <th data-k="symbol">Ticker</th><th data-k="name">Società</th>
+        <th data-k="ipo_date">Quotazione</th><th data-k="ipo_price">Prezzo IPO</th>
+        <th data-k="pop_open">Pop apertura</th><th data-k="ret_d1">Day 1</th>
+        <th data-k="ret_w1">+1 sett</th><th data-k="ret_m1">+1 mese</th>
+        <th data-k="ret_y1">+1 anno</th><th data-k="ret_last">Oggi</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="chartbox">
+    <h3>Day 1 — ultime 15 quotazioni</h3>
+    <div class="chartwrap"><canvas id="d1chart"></canvas></div>
+  </div>
+</section>
+
+<footer>IPO DESK <span>·</span> dati Finnhub + Yahoo Finance <span>·</span> solo uso informativo, nessuna consulenza</footer>
+</div>
+
+<script>
+const DEMO = {
+  updated: "2026-06-11T06:30:00Z",
+  upcoming: [
+    {symbol:"SPCX",name:"SpaceX Corp",date:"2026-06-12",exchange:"NASDAQ",price_range:"135.00",deal_value:7.5e10,status:"expected"},
+    {symbol:"DEMO1",name:"Demo Robotics Inc",date:"2026-06-18",exchange:"NYSE",price_range:"18.00-21.00",deal_value:4.2e8,status:"expected"},
+    {symbol:"DEMO2",name:"Esempio Biotech SpA",date:"2026-06-25",exchange:"NASDAQ",price_range:"12.00-14.00",deal_value:1.6e8,status:"filed"}
+  ],
+  listed: [
+    {symbol:"EX1",name:"Esempio Software",ipo_date:"2026-05-20",ipo_price:24,price_source:"collocamento",open_d1:31.5,pop_open:31.2,ret_d1:42.5,px_d1:34.2,ret_w1:38.1,px_w1:33.14,ret_m1:null,px_m1:null,ret_y1:null,px_y1:null,ret_last:35.4,last:32.5},
+    {symbol:"EX2",name:"Demo Energy",ipo_date:"2026-03-04",ipo_price:17,price_source:"collocamento",open_d1:18.5,pop_open:8.8,ret_d1:5.2,px_d1:17.88,ret_w1:-3.1,px_w1:16.47,ret_m1:-11.4,px_m1:15.06,ret_y1:null,px_y1:null,ret_last:-18.2,last:13.9},
+    {symbol:"EX3",name:"Sample Fintech",ipo_date:"2025-07-15",ipo_price:31,price_source:"open D1",open_d1:50.84,pop_open:64,ret_d1:72.9,px_d1:53.6,ret_w1:55.3,px_w1:48.14,ret_m1:40.8,px_m1:43.65,ret_y1:-22.5,px_y1:24.03,ret_last:-20.1,last:24.8}
+  ]
+};
+
+let DATA=null, sortK="ipo_date", sortAsc=false, chart=null, mode="both";
+
+const $=s=>document.querySelector(s);
+const fmtPct=v=>v==null?'<span class="na">—</span>':`<span class="${v>=0?'pos':'neg'}">${v>=0?'+':''}${v.toFixed(1)}%</span>`;
+const fmtPx=v=>v==null?'':`<span class="px">$${v.toFixed(2)}</span>`;
+function cell(ret,px){
+  if(ret==null&&px==null)return '<span class="na">—</span>';
+  if(mode==='pct')return fmtPct(ret);
+  if(mode==='px')return px==null?'<span class="na">—</span>':`$${px.toFixed(2)}`;
+  return fmtPct(ret)+(px!=null?'<br>'+fmtPx(px):'');
+}
+const fmtVal=v=>!v?'—':v>=1e9?(v/1e9).toFixed(1)+' mld $':(v/1e6).toFixed(0)+' M$';
+const fmtDate=d=>{const x=new Date(d+'T00:00:00');return x.toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'2-digit'})};
+
+async function load(){
+  try{
+    const r=await fetch('data/ipos.json',{cache:'no-store'});
+    if(!r.ok) throw 0;
+    DATA=await r.json();
+  }catch(e){ DATA=DEMO; }
+  render();
+}
+
+function render(){
+  const upd=new Date(DATA.updated);
+  $('#updated').textContent=isNaN(upd)?DATA.updated:upd.toLocaleString('it-IT');
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  const in30=DATA.upcoming.filter(r=>{const d=new Date(r.date);return (d-today)/864e5<=30});
+  $('#k-up').textContent=in30.length;
+  const tot=in30.reduce((s,r)=>s+(r.deal_value||0),0);
+  $('#k-up-s').textContent=tot?('raccolta attesa '+fmtVal(tot)):'';
+
+  const d90=DATA.listed.filter(r=>(today-new Date(r.ipo_date))/864e5<=90);
+  $('#k-new').textContent=d90.length;
+
+  const d1s=DATA.listed.map(r=>r.ret_d1).filter(v=>v!=null);
+  if(d1s.length){const m=d1s.reduce((a,b)=>a+b,0)/d1s.length;
+    $('#k-d1').innerHTML=fmtPct(+m.toFixed(1));}
+
+  const m1s=DATA.listed.map(r=>r.ret_m1).filter(v=>v!=null);
+  if(m1s.length){const p=m1s.filter(v=>v>0).length/m1s.length*100;
+    $('#k-m1').textContent=p.toFixed(0)+'%';
+    $('#k-m1-s').textContent='su '+m1s.length+' IPO con 1 mese di storia';}
+
+  const yrs=[...new Set(DATA.listed.map(r=>r.ipo_date.slice(0,4)))].sort().reverse();
+  const sel=$('#y-perf'); const cur=sel.value;
+  sel.innerHTML='<option value="">Tutti gli anni</option>'+yrs.map(y=>`<option ${y===cur?'selected':''}>${y}</option>`).join('');
+
+  renderCal(); renderTable(); renderChart();
+}
+
+function renderCal(){
+  const q=($('#q-cal').value||'').toLowerCase();
+  const box=$('#cal-list'); box.innerHTML='';
+  const rows=DATA.upcoming.filter(r=>!q||r.symbol.toLowerCase().includes(q)||(r.name||'').toLowerCase().includes(q));
+  if(!rows.length){box.innerHTML='<div class="empty">Nessuna IPO in calendario per i filtri attuali.</div>';return;}
+  const today=new Date(); today.setHours(0,0,0,0);
+  const groups={};
+  rows.forEach(r=>{(groups[r.date]=groups[r.date]||[]).push(r)});
+  Object.keys(groups).sort().forEach(d=>{
+    const days=Math.round((new Date(d+'T00:00:00')-today)/864e5);
+    const g=document.createElement('div'); g.className='day-group';
+    g.innerHTML=`<div class="day-head"><span class="d">${fmtDate(d)}</span><span class="c">${days===0?'oggi':days===1?'domani':'tra '+days+' giorni'}</span></div>`;
+    groups[d].forEach(r=>{
+      const c=document.createElement('div'); c.className='card';
+      c.innerHTML=`<div class="sym">${r.symbol||'—'}</div>
+        <div><div class="nm">${r.name||''}</div></div>
+        <div class="meta"><b>${r.price_range||'n.d.'}</b>prezzo / range</div>
+        <div class="meta"><b>${fmtVal(r.deal_value)}</b>raccolta</div>
+        <div><span class="badge ${days<=3?'soon':''}">${r.exchange||r.status}</span></div>`;
+      g.appendChild(c);
+    });
+    box.appendChild(g);
+  });
+}
+
+function renderTable(){
+  const q=($('#q-perf').value||'').toLowerCase();
+  const yr=$('#y-perf').value;
+  let rows=DATA.listed.filter(r=>
+    (!q||r.symbol.toLowerCase().includes(q)||(r.name||'').toLowerCase().includes(q))&&
+    (!yr||r.ipo_date.startsWith(yr)));
+  rows.sort((a,b)=>{
+    let x=a[sortK],y=b[sortK];
+    if(x==null)return 1; if(y==null)return -1;
+    if(typeof x==='string')return sortAsc?x.localeCompare(y):y.localeCompare(x);
+    return sortAsc?x-y:y-x;
+  });
+  const total=rows.length, CAP=300;
+  rows=rows.slice(0,CAP);
+  const tb=$('#tbody'); tb.innerHTML='';
+  if(!rows.length){tb.innerHTML='<tr><td colspan="10" class="empty">Nessun titolo trovato.</td></tr>';return;}
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="t-sym">${r.symbol}</td>
+      <td class="t-nm">${r.name||''}</td>
+      <td class="t-dt">${fmtDate(r.ipo_date)}</td>
+      <td>$${(r.ipo_price??0).toFixed(2)}<span class="src">${r.price_source||''}</span></td>
+      <td>${cell(r.pop_open,r.open_d1)}</td><td>${cell(r.ret_d1,r.px_d1)}</td>
+      <td>${cell(r.ret_w1,r.px_w1)}</td><td>${cell(r.ret_m1,r.px_m1)}</td>
+      <td>${cell(r.ret_y1,r.px_y1)}</td><td>${cell(r.ret_last,r.last)}</td>`;
+    tb.appendChild(tr);
+  });
+  if(total>CAP){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td colspan="10" class="empty">Mostrate ${CAP} di ${total} — restringi con ricerca o filtro anno.</td>`;
+    tb.appendChild(tr);
+  }
+  document.querySelectorAll('th').forEach(th=>{
+    th.innerHTML=th.innerHTML.replace(/ <span class="ar">.*<\/span>/,'');
+    if(th.dataset.k===sortK) th.innerHTML+=` <span class="ar">${sortAsc?'▲':'▼'}</span>`;
+  });
+}
+
+function renderChart(){
+  const rows=[...DATA.listed].filter(r=>r.ret_d1!=null)
+    .sort((a,b)=>a.ipo_date.localeCompare(b.ipo_date)).slice(-15);
+  const ctx=$('#d1chart');
+  if(chart)chart.destroy();
+  chart=new Chart(ctx,{type:'bar',
+    data:{labels:rows.map(r=>r.symbol),
+      datasets:[{data:rows.map(r=>r.ret_d1),
+        backgroundColor:rows.map(r=>r.ret_d1>=0?'rgba(46,204,143,.75)':'rgba(240,82,76,.75)'),
+        borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>(c.parsed.y>=0?'+':'')+c.parsed.y.toFixed(1)+'% al Day 1'}}},
+      scales:{x:{ticks:{color:'#7C8698',font:{family:'JetBrains Mono',size:10}},grid:{display:false}},
+        y:{ticks:{color:'#7C8698',font:{family:'JetBrains Mono',size:10},callback:v=>v+'%'},
+          grid:{color:'#1A2030'}}}}});
+}
+
+document.querySelectorAll('.tab:not(.mini)').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab:not(.mini)').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('section').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); $('#'+t.dataset.tab).classList.add('on');
+});
+document.querySelectorAll('.tab.mini').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab.mini').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); mode=t.dataset.mode; renderTable();
+});
+document.querySelectorAll('th').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.k;
+  if(sortK===k)sortAsc=!sortAsc;else{sortK=k;sortAsc=false;}
+  renderTable();
+});
+$('#q-cal').addEventListener('input',renderCal);
+$('#q-perf').addEventListener('input',renderTable);
+$('#y-perf').addEventListener('change',renderTable);
+
+load();
+</script>
+</body>
+</html>
