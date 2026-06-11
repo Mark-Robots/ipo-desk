@@ -86,6 +86,16 @@ tr:hover td{background:var(--panel2)}
   padding:18px;margin-top:18px}
 .chartbox h3{font-family:'Fraunces',serif;font-size:15px;font-weight:700;margin-bottom:12px;color:var(--txt)}
 .chartwrap{position:relative;height:280px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-top:14px}
+.statgrid .chartbox{margin-top:0}
+.tblwrap.mini{border:none;background:transparent}
+table.stat{min-width:0;width:100%}
+table.stat th{cursor:default;padding:8px 10px}
+table.stat th:hover{color:var(--mut)}
+table.stat td{padding:8px 10px;font-size:12px}
+table.stat th:first-child,table.stat td:first-child{text-align:left}
+.kpi .v.small{font-size:16px;line-height:1.45}
+.kpi .v.small b{color:var(--acc)}
 
 .empty{color:var(--dim);text-align:center;padding:40px 0;font-size:12px}
 footer{margin-top:34px;color:var(--dim);font-size:10px;text-align:center;letter-spacing:1px}
@@ -118,6 +128,7 @@ footer span{color:var(--acc)}
 <div class="tabs">
   <button class="tab on" data-tab="cal">Calendario</button>
   <button class="tab" data-tab="perf">Performance</button>
+  <button class="tab" data-tab="stats">Statistiche</button>
 </div>
 
 <section id="cal" class="on">
@@ -154,6 +165,47 @@ footer span{color:var(--acc)}
   <div class="chartbox">
     <h3>Day 1 — ultime 15 quotazioni</h3>
     <div class="chartwrap"><canvas id="d1chart"></canvas></div>
+  </div>
+</section>
+
+<section id="stats">
+  <div class="bar">
+    <select id="y-stats"><option value="">Tutti gli anni</option></select>
+    <span class="hint">Statistiche calcolate sul campione corrente del feed · si aggiornano col backfill</span>
+  </div>
+
+  <div class="kpis" id="rules"></div>
+
+  <div class="statgrid">
+    <div class="chartbox">
+      <h3>Rendimenti per checkpoint</h3>
+      <div class="tblwrap mini"><table class="stat"><thead><tr>
+        <th>Checkpoint</th><th>n</th><th>Media</th><th>Mediana</th><th>% pos</th>
+      </tr></thead><tbody id="stat-sum"></tbody></table></div>
+    </div>
+    <div class="chartbox">
+      <h3>Regola momentum — Day 1 → +1 mese</h3>
+      <div class="tblwrap mini"><table class="stat"><thead><tr>
+        <th>Gruppo Day 1</th><th>n</th><th>Mediana +1M</th><th>% pos +1M</th>
+      </tr></thead><tbody id="stat-pers"></tbody></table></div>
+    </div>
+    <div class="chartbox">
+      <h3>Day 1 per dimensione collocamento</h3>
+      <div class="tblwrap mini"><table class="stat"><thead><tr>
+        <th>Raccolta</th><th>n</th><th>Mediana D1</th><th>% pos D1</th><th>Mediana +1M</th>
+      </tr></thead><tbody id="stat-size"></tbody></table></div>
+    </div>
+    <div class="chartbox">
+      <h3>Annate — cosa rende a 1 anno</h3>
+      <div class="tblwrap mini"><table class="stat"><thead><tr>
+        <th>Anno IPO</th><th>n</th><th>Mediana D1</th><th>Mediana +1A</th><th>% pos +1A</th>
+      </tr></thead><tbody id="stat-year"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="chartbox">
+    <h3>Day 1 mediano per mese di quotazione</h3>
+    <div class="chartwrap"><canvas id="mchart"></canvas></div>
   </div>
 </section>
 
@@ -223,8 +275,10 @@ function render(){
   const yrs=[...new Set(DATA.listed.map(r=>r.ipo_date.slice(0,4)))].sort().reverse();
   const sel=$('#y-perf'); const cur=sel.value;
   sel.innerHTML='<option value="">Tutti gli anni</option>'+yrs.map(y=>`<option ${y===cur?'selected':''}>${y}</option>`).join('');
+  const sel2=$('#y-stats'); const cur2=sel2.value;
+  sel2.innerHTML='<option value="">Tutti gli anni</option>'+yrs.map(y=>`<option ${y===cur2?'selected':''}>${y}</option>`).join('');
 
-  renderCal(); renderTable(); renderChart();
+  renderCal(); renderTable(); renderChart(); renderStats();
 }
 
 function renderCal(){
@@ -308,6 +362,82 @@ function renderChart(){
           grid:{color:'#1A2030'}}}}});
 }
 
+/* ---------------- statistiche ---------------- */
+const median=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y),m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2};
+const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+const posPct=a=>a.length?100*a.filter(v=>v>0).length/a.length:null;
+const vals=(rows,k)=>rows.map(r=>r[k]).filter(v=>v!=null);
+const fp=(v,dec=1)=>v==null?'—':`<span class="${v>=0?'pos':'neg'}">${v>=0?'+':''}${v.toFixed(dec)}%</span>`;
+const fn=v=>v==null?'—':v.toFixed(0)+'%';
+let mchart=null;
+
+function statRows(){
+  const yr=$('#y-stats').value;
+  return DATA.listed.filter(r=>!yr||r.ipo_date.startsWith(yr));
+}
+
+function renderStats(){
+  const rows=statRows();
+  // --- tabella riassuntiva checkpoint
+  const cps=[['pop_open','Pop apertura'],['ret_d1','Day 1'],['ret_w1','+1 settimana'],['ret_m1','+1 mese'],['ret_y1','+1 anno'],['ret_last','Oggi']];
+  $('#stat-sum').innerHTML=cps.map(([k,l])=>{
+    const v=vals(rows,k);
+    return `<tr><td>${l}</td><td>${v.length}</td><td>${fp(mean(v))}</td><td>${fp(median(v))}</td><td>${fn(posPct(v))}</td></tr>`;
+  }).join('');
+
+  // --- regola momentum D1 -> M1
+  const both=rows.filter(r=>r.ret_d1!=null&&r.ret_m1!=null);
+  const buckets=[['D1 > +20%',r=>r.ret_d1>20],['D1 0% / +20%',r=>r.ret_d1>0&&r.ret_d1<=20],['D1 ≤ 0%',r=>r.ret_d1<=0]];
+  $('#stat-pers').innerHTML=buckets.map(([l,f])=>{
+    const g=both.filter(f),m1=g.map(r=>r.ret_m1);
+    return `<tr><td>${l}</td><td>${g.length}</td><td>${fp(median(m1))}</td><td>${fn(posPct(m1))}</td></tr>`;
+  }).join('');
+
+  // --- dimensione collocamento
+  const sizes=[['30–100M$',r=>r.deal_value<100e6],['100–500M$',r=>r.deal_value>=100e6&&r.deal_value<500e6],['> 500M$',r=>r.deal_value>=500e6]];
+  $('#stat-size').innerHTML=sizes.map(([l,f])=>{
+    const g=rows.filter(r=>r.deal_value&&f(r));
+    return `<tr><td>${l}</td><td>${vals(g,'ret_d1').length}</td><td>${fp(median(vals(g,'ret_d1')))}</td><td>${fn(posPct(vals(g,'ret_d1')))}</td><td>${fp(median(vals(g,'ret_m1')))}</td></tr>`;
+  }).join('');
+
+  // --- annate (cohort) a 1 anno
+  const yrs=[...new Set(DATA.listed.map(r=>r.ipo_date.slice(0,4)))].sort();
+  $('#stat-year').innerHTML=yrs.map(y=>{
+    const g=DATA.listed.filter(r=>r.ipo_date.startsWith(y));
+    return `<tr><td>${y}</td><td>${g.length}</td><td>${fp(median(vals(g,'ret_d1')))}</td><td>${fp(median(vals(g,'ret_y1')))}</td><td>${fn(posPct(vals(g,'ret_y1')))}</td></tr>`;
+  }).join('');
+
+  // --- "regole" auto-generate (card)
+  const cards=[];
+  const big=rows.filter(r=>r.deal_value>=500e6),small=rows.filter(r=>r.deal_value&&r.deal_value<500e6);
+  const bD1=median(vals(big,'ret_d1')),sD1=median(vals(small,'ret_d1'));
+  if(bD1!=null&&sD1!=null&&vals(big,'ret_d1').length>=10)
+    cards.push({l:'Regola dimensione',v:`Deal >500M$: D1 mediano <b>${bD1>=0?'+':''}${bD1.toFixed(1)}%</b> vs ${sD1>=0?'+':''}${sD1.toFixed(1)}% dei piccoli`,s:`${vals(big,'ret_d1').length} grandi nel campione`});
+  const hot=both.filter(r=>r.ret_d1>20),cold=both.filter(r=>r.ret_d1<=0);
+  if(hot.length>=8&&cold.length>=8)
+    cards.push({l:'Regola momentum',v:`Pop D1 >+20% → a 1 mese positive <b>${posPct(hot.map(r=>r.ret_m1)).toFixed(0)}%</b> vs ${posPct(cold.map(r=>r.ret_m1)).toFixed(0)}% delle fredde`,s:'il primo giorno anticipa il primo mese'});
+  const y1=vals(rows,'ret_y1');
+  if(y1.length>=15)
+    cards.push({l:'A 1 anno',v:`Solo <b>${posPct(y1).toFixed(0)}%</b> sopra il collocamento · mediana ${median(y1)>=0?'+':''}${median(y1).toFixed(1)}%`,s:`su ${y1.length} IPO con 12 mesi di storia`});
+  const d1=vals(rows,'ret_d1');
+  if(d1.length)
+    cards.push({l:'IPO tipica',v:`D1 mediano <b>${median(d1)>=0?'+':''}${median(d1).toFixed(1)}%</b> · media ${mean(d1)>=0?'+':''}${mean(d1).toFixed(1)}%`,s:'media > mediana = pochi outlier trascinano'});
+  $('#rules').innerHTML=cards.map(c=>`<div class="kpi"><div class="l">${c.l}</div><div class="v small">${c.v}</div><div class="s">${c.s}</div></div>`).join('')||'<div class="empty">Campione ancora troppo piccolo: completa il backfill.</div>';
+
+  // --- grafico mensile
+  const mm={};
+  rows.forEach(r=>{if(r.ret_d1!=null){const m=r.ipo_date.slice(0,7);(mm[m]=mm[m]||[]).push(r.ret_d1);}});
+  const keys=Object.keys(mm).sort().slice(-24);
+  if(mchart)mchart.destroy();
+  mchart=new Chart($('#mchart'),{type:'bar',
+    data:{labels:keys,datasets:[{data:keys.map(k=>median(mm[k])),
+      backgroundColor:keys.map(k=>median(mm[k])>=0?'rgba(46,204,143,.75)':'rgba(240,82,76,.75)'),borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'mediana '+(c.parsed.y>=0?'+':'')+c.parsed.y.toFixed(1)+'% su '+mm[keys[c.dataIndex]].length+' IPO'}}},
+      scales:{x:{ticks:{color:'#7C8698',font:{family:'JetBrains Mono',size:9}},grid:{display:false}},
+        y:{ticks:{color:'#7C8698',font:{family:'JetBrains Mono',size:10},callback:v=>v+'%'},grid:{color:'#1A2030'}}}}});
+}
+
 document.querySelectorAll('.tab:not(.mini)').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab:not(.mini)').forEach(x=>x.classList.remove('on'));
   document.querySelectorAll('section').forEach(x=>x.classList.remove('on'));
@@ -325,6 +455,7 @@ document.querySelectorAll('th').forEach(th=>th.onclick=()=>{
 $('#q-cal').addEventListener('input',renderCal);
 $('#q-perf').addEventListener('input',renderTable);
 $('#y-perf').addEventListener('change',renderTable);
+$('#y-stats').addEventListener('change',renderStats);
 
 load();
 </script>
